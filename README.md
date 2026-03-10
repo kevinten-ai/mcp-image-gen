@@ -1,90 +1,115 @@
-# Image Generation MCP Server
+# Gemini Image Gen MCP Server
 
-A Model Context Protocol (MCP) server that enables seamless generation of high-quality images via Together AI. This server provides a standardized interface to specify image generation parameters.
+![Banner](docs/banner.png)
 
-<a href="https://glama.ai/mcp/servers/o0137xiz62">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/o0137xiz62/badge" alt="Image Generation Server MCP server" />
-</a>
+A lightweight [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for AI image generation using Google Gemini. Works with Claude Code, Claude Desktop, Cursor, and any MCP-compatible client.
 
 ## Features
 
-- High-quality image generation powered by the Flux.1 Schnell model
-- Support for customizable dimensions (width and height)
-- Clear error handling for prompt validation and API issues
-- Easy integration with MCP-compatible clients
+- Text-to-image generation powered by Google Gemini
+- Multiple model support (Nano Banana 2, experimental, Pro)
+- Auto-save generated images to disk
+- SOCKS proxy support out of the box
+- Simple single-tool interface — just describe what you want
 
-## Installation
+## Demo
 
-#### Claude Desktop
+![Demo](docs/demo.png)
 
-- On MacOS: `~/Library/Application\ Support/Claude/claude_desktop_config.json`
-- On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
+## Architecture
 
-<summary>Development/Unpublished Servers Configuration</summary>
+![Architecture](docs/architecture.png)
+
+```
+User Prompt → AI Assistant (Claude / Cursor) → MCP Server → Gemini API
+                                                   ↓
+                                             Save to disk + Display
+```
+
+## Quick Start
+
+### 1. Get a Gemini API Key
+
+Go to [Google AI Studio](https://aistudio.google.com/apikey) and create an API key.
+
+### 2. Configure MCP
+
+#### Claude Code
+
+```bash
+claude mcp add --transport stdio gemini-image \
+  --env GEMINI_API_KEY=your_api_key \
+  --env GEMINI_MODEL=gemini-3.1-flash-image-preview \
+  -- uv --directory /path/to/gemini-image-gen run image-gen
+```
+
+#### Claude Desktop / Cursor
+
+Add to your MCP config file:
 
 ```json
 {
   "mcpServers": {
-    "image-gen": {
+    "gemini-image": {
       "command": "uv",
-      "args": ["--directory", "/ABSOLUTE/PATH/TO/image-gen/", "run", "image-gen"],
+      "args": ["--directory", "/path/to/gemini-image-gen", "run", "image-gen"],
       "env": {
-        "TOGETHER_AI_API_KEY": "<API KEY>"
+        "GEMINI_API_KEY": "your_api_key",
+        "GEMINI_MODEL": "gemini-3.1-flash-image-preview"
       }
     }
   }
 }
 ```
 
-## Available Tools
+### 3. Use it
 
-The server implements one tool:
+Just ask your AI assistant to generate an image:
 
-### generate_image
-
-Generates an image based on the given textual prompt and optional dimensions.
-
-**Input Schema:**
-
-```json
-{
-  "prompt": {
-    "type": "string",
-    "description": "A descriptive prompt for generating the image (e.g., 'a futuristic cityscape at sunset')"
-  },
-  "width": {
-    "type": "integer",
-    "description": "Width of the generated image in pixels (optional)"
-  },
-  "height": {
-    "type": "integer",
-    "description": "Height of the generated image in pixels (optional)"
-  },
-  "model": {
-    "type": "string",
-    "description": "The exact model name as it appears in Together AI. If incorrect, it will fallback to the default model (black-forest-labs/FLUX.1-schnell)."
-  }
-}
 ```
+"Generate an image of a dragon flying over mountains at dawn"
+```
+
+The image will be displayed inline and saved to the `output/` directory.
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `GEMINI_API_KEY` | Yes | - | Google Gemini API key |
+| `GEMINI_MODEL` | No | `gemini-2.0-flash-exp-image-generation` | Model to use (see below) |
+| `IMAGE_OUTPUT_DIR` | No | `./output` | Directory to save generated images |
+
+## Supported Models
+
+| Model ID | Name | Notes |
+|---|---|---|
+| `gemini-2.0-flash-exp-image-generation` | Experimental | Widely available, good default |
+| `gemini-3.1-flash-image-preview` | Nano Banana 2 | Higher quality, requires paid tier |
+| `gemini-3-pro-image-preview` | Nano Banana Pro | Best quality, requires paid tier |
+| `gemini-2.5-flash-image` | Nano Banana | Requires paid tier |
 
 ## Prerequisites
 
-- Python 3.12 or higher
-- httpx
-- mcp
+- Python 3.10+
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
 
-## Contributing
+## Local Development
 
-Contributions are welcome! Please follow these steps to contribute:
+```bash
+git clone https://github.com/your-username/gemini-image-gen.git
+cd gemini-image-gen
 
-1. Fork the repository
-2. Create a new branch (`feature/my-new-feature`)
-3. Commit your changes
-4. Push the branch to your fork
-5. Open a Pull Request
+# Install dependencies
+uv sync
 
-For significant changes, please open an issue first to discuss your proposed changes.
+# Copy and edit environment variables
+cp .env.example .env
+
+# Run the server
+uv run image-gen
+```
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+MIT

@@ -8,3 +8,12 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Environment variables
+.env
+
+# Generated images
+output/
+
+# OS files
+.DS_Store
