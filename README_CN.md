@@ -1,14 +1,23 @@
 # Gemini Image Gen MCP Server
 
-![Banner](docs/banner.png)
+<p align="center">
+  <img src="docs/banner.png" alt="Banner" width="800">
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
+<p align="center">
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+"></a>
+  <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-compatible-green.svg" alt="MCP"></a>
+</p>
 
-一个轻量级的 [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) 服务器，基于 Google Gemini 实现 AI 图片生成。支持 Claude Code、Claude Desktop、Cursor 及所有 MCP 兼容客户端。
+<p align="center">
+  一个轻量级的 <a href="https://modelcontextprotocol.io/">MCP</a> 服务器，基于 Google Gemini 实现 AI 图片生成。<br>
+  支持 Claude Code、Claude Desktop、Cursor 及所有 MCP 兼容客户端。
+</p>
 
-**[English](README.md)**
+<p align="center">
+  <a href="README.md">English</a>
+</p>
 
 ## 特性
 
@@ -20,11 +29,15 @@
 
 ## 效果演示
 
-![Demo](docs/demo.png)
+<p align="center">
+  <img src="docs/demo.png" alt="Demo" width="700">
+</p>
 
 ## 架构
 
-![Architecture](docs/architecture.png)
+<p align="center">
+  <img src="docs/architecture.png" alt="Architecture" width="700">
+</p>
 
 ```
 用户提示词 → AI 助手（Claude / Cursor）→ MCP Server → Gemini API
@@ -36,9 +49,21 @@
 
 ### 1. 获取 Gemini API Key
 
-打开 [Google AI Studio](https://aistudio.google.com/apikey)，创建一个 API Key。实验版模型无需信用卡。
+| 项目 | 详情 |
+|---|---|
+| 平台 | Google AI Studio |
+| 地址 | https://aistudio.google.com/apikey |
+| 免费额度 | **实验版模型完全免费，无需信用卡** |
+| 环境变量 | `GEMINI_API_KEY` |
 
-> 如需使用更高质量模型（Nano Banana 2 / Pro），需要在 [AI Studio](https://aistudio.google.com/billing) 开启付费。
+**注册步骤：**
+1. 访问 https://aistudio.google.com/apikey
+2. 使用 Google 账号登录
+3. 点击 **"Create API Key"**（创建 API Key）
+4. 选择或创建一个 Google Cloud 项目
+5. 复制生成的 Key（格式：`AIzaSy...`）
+
+> 如需使用更高质量模型（Nano Banana 2 / Pro），需要在 [AI Studio 计费页面](https://aistudio.google.com/billing) 开启付费。
 
 ### 2. 安装
 
@@ -180,6 +205,10 @@ uv run image-gen
 | `User location is not supported` | 部分模型有地区限制，尝试使用 `gemini-2.0-flash-exp-image-generation` |
 | `SOCKS proxy error` | 已内置 `httpx[socks]` 依赖，运行 `uv sync` 安装即可 |
 | `No image generated` | 尝试更具体的描述，或换一种说法 |
+
+## 相关项目
+
+- [mcp-video-gen](https://github.com/kevinten-ai/mcp-video-gen) — 多平台 AI 视频生成 MCP 服务器
 
 ## 许可证
 
