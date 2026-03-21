@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  A lightweight <a href="https://modelcontextprotocol.io/">MCP</a> server for AI image generation using Google Gemini.<br>
+  A lightweight <a href="https://modelcontextprotocol.io/">MCP</a> server for AI image generation using Google Gemini and Imagen.<br>
   Works with Claude Code, Claude Desktop, Cursor, and any MCP-compatible client.
 </p>
 
@@ -21,8 +21,8 @@
 
 ## Features
 
-- Text-to-image generation powered by Google Gemini
-- Multiple model support (Nano Banana 2, experimental, Pro)
+- **Dual provider** — AI Studio (free) or Vertex AI (GCP credits)
+- **Multi-model** — Gemini image generation + Imagen 3.0
 - Auto-save generated images to disk
 - SOCKS proxy support out of the box
 - Simple single-tool interface — just describe what you want
@@ -40,54 +40,28 @@
 </p>
 
 ```
-User Prompt → AI Assistant (Claude / Cursor) → MCP Server → Gemini API
+User Prompt → AI Assistant (Claude / Cursor) → MCP Server → Gemini API / Vertex AI
                                                    ↓
                                              Save to disk + Display
 ```
 
 ## Quick Start
 
-### 1. Get a Gemini API Key
+### Option A: AI Studio (Free, Recommended)
 
-| Item | Detail |
-|---|---|
-| Platform | Google AI Studio |
-| URL | https://aistudio.google.com/apikey |
-| Free Tier | **Experimental model is free, no credit card required** |
-| Env Var | `GEMINI_API_KEY` |
+**1. Get API Key** — visit https://aistudio.google.com/apikey → Create API Key → copy it
 
-**Steps:**
-1. Visit https://aistudio.google.com/apikey
-2. Sign in with your Google account
-3. Click **"Create API Key"**
-4. Select or create a Google Cloud project
-5. Copy the generated key (format: `AIzaSy...`)
-
-> For higher quality models (Nano Banana 2 / Pro), you need to [enable billing](https://aistudio.google.com/billing) on your Google Cloud project.
-
-### 2. Install
+**2. Configure MCP**
 
 ```bash
-git clone https://github.com/kevinten-ai/mcp-image-gen.git
-cd mcp-image-gen
-uv sync
-```
-
-### 3. Configure MCP
-
-#### Claude Code
-
-```bash
+# Claude Code
 claude mcp add --transport stdio gemini-image \
   --env GEMINI_API_KEY=your_api_key \
   -- uv --directory /path/to/mcp-image-gen run image-gen
 ```
 
-#### Claude Desktop
-
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%/Claude/claude_desktop_config.json` (Windows):
-
 ```json
+// Claude Desktop / Cursor
 {
   "mcpServers": {
     "gemini-image": {
@@ -101,11 +75,46 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
 }
 ```
 
-#### Cursor
+### Option B: Vertex AI (GCP Free Credits)
 
-Add to `.cursor/mcp.json` in your project root or `~/.cursor/mcp.json` globally. Same JSON format as above.
+Use GCP billing with Imagen 3.0 for higher quality results.
 
-### 4. Use it
+**1. Prerequisites**
+- A GCP project with billing enabled
+- Vertex AI API enabled
+- A GCP API key (from [APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials))
+
+**2. Install with Vertex AI support**
+
+```bash
+git clone https://github.com/kevinten-ai/mcp-image-gen.git
+cd mcp-image-gen
+uv sync --extra vertex
+```
+
+**3. Configure MCP**
+
+```json
+{
+  "mcpServers": {
+    "gemini-image": {
+      "command": "uv",
+      "args": ["--directory", "/path/to/mcp-image-gen", "--extra", "vertex", "run", "image-gen"],
+      "env": {
+        "GEMINI_PROVIDER": "vertex-ai",
+        "GEMINI_API_KEY": "your_gcp_api_key",
+        "GCP_PROJECT_ID": "your-project-id",
+        "GCP_REGION": "us-central1",
+        "GEMINI_MODEL": "imagen-3.0-generate-002"
+      }
+    }
+  }
+}
+```
+
+> **Tip:** Vertex AI also supports OAuth2/ADC authentication. If `GEMINI_API_KEY` is not set, the server will use `gcloud auth application-default login` credentials.
+
+### 3. Use it
 
 Just ask your AI assistant to generate an image:
 
@@ -138,15 +147,16 @@ Simply describe what you want in natural language:
 
 Set `GEMINI_MODEL` to switch models:
 
+**AI Studio (Gemini models):**
 ```bash
-# Experimental — free, widely available (default)
---env GEMINI_MODEL=gemini-2.0-flash-exp-image-generation
+--env GEMINI_MODEL=gemini-2.0-flash-exp-image-generation      # free, experimental (default)
+--env GEMINI_MODEL=gemini-2.0-flash-preview-image-generation   # preview
+```
 
-# Nano Banana 2 — higher quality, paid tier
---env GEMINI_MODEL=gemini-3.1-flash-image-preview
-
-# Nano Banana Pro — best quality, paid tier
---env GEMINI_MODEL=gemini-3-pro-image-preview
+**Vertex AI (Imagen models):**
+```bash
+--env GEMINI_MODEL=imagen-3.0-generate-002       # high quality
+--env GEMINI_MODEL=imagen-3.0-fast-generate-001   # faster, lower cost
 ```
 
 ### Custom Output Directory
@@ -155,24 +165,32 @@ Set `GEMINI_MODEL` to switch models:
 --env IMAGE_OUTPUT_DIR=/absolute/path/to/your/images
 ```
 
-Images are saved as `gemini_YYYYMMDD_HHMMSS.png`.
-
 ## Environment Variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `GEMINI_API_KEY` | Yes | — | Google Gemini API key from [AI Studio](https://aistudio.google.com/apikey) |
-| `GEMINI_MODEL` | No | `gemini-2.0-flash-exp-image-generation` | Model to use for generation |
-| `IMAGE_OUTPUT_DIR` | No | `./output` | Directory to save generated images |
+| `GEMINI_PROVIDER` | No | `ai-studio` | `ai-studio` or `vertex-ai` |
+| `GEMINI_API_KEY` | Yes | — | API key (AI Studio or GCP) |
+| `GEMINI_MODEL` | No | `gemini-2.0-flash-exp-image-generation` | Model for generation |
+| `IMAGE_OUTPUT_DIR` | No | `./output` | Directory to save images |
+| `GCP_PROJECT_ID` | Vertex AI | — | GCP project ID |
+| `GCP_REGION` | No | `us-central1` | GCP region |
 
 ## Supported Models
 
-| Model ID | Name | Quality | Pricing |
-|---|---|---|---|
-| `gemini-2.0-flash-exp-image-generation` | Experimental | Good | Free |
-| `gemini-3.1-flash-image-preview` | Nano Banana 2 | High | ~$0.039/image |
-| `gemini-3-pro-image-preview` | Nano Banana Pro | Best | ~$0.134/image |
-| `gemini-2.5-flash-image` | Nano Banana | Good | ~$0.039/image |
+### AI Studio (Gemini)
+
+| Model ID | Quality | Pricing |
+|---|---|---|
+| `gemini-2.0-flash-exp-image-generation` | Good | Free |
+| `gemini-2.0-flash-preview-image-generation` | Good | Free |
+
+### Vertex AI (Imagen)
+
+| Model ID | Quality | Pricing |
+|---|---|---|
+| `imagen-3.0-generate-002` | High | ~$0.04/image |
+| `imagen-3.0-fast-generate-001` | Good | ~$0.02/image |
 
 ## Prerequisites
 
@@ -185,7 +203,7 @@ Images are saved as `gemini_YYYYMMDD_HHMMSS.png`.
 git clone https://github.com/kevinten-ai/mcp-image-gen.git
 cd mcp-image-gen
 
-# Install dependencies
+# Install dependencies (add --extra vertex for Vertex AI support)
 uv sync
 
 # Copy and configure environment variables
@@ -201,9 +219,11 @@ uv run image-gen
 | Issue | Solution |
 |---|---|
 | `GEMINI_API_KEY not set` | Set the environment variable in your MCP config |
-| `429 quota exceeded` | Enable billing at [AI Studio](https://aistudio.google.com/billing), or switch to the experimental model |
+| `429 quota exceeded` | Enable billing or switch to the free experimental model |
+| `429 spending cap exceeded` | Increase your GCP spending cap in Billing → Budgets |
+| `404 model not found` | Check model name — Vertex AI and AI Studio use different model IDs |
+| `401 API keys not supported` | Some Vertex AI models need OAuth2 — run `gcloud auth application-default login` |
 | `User location is not supported` | Some models have regional restrictions. Try `gemini-2.0-flash-exp-image-generation` |
-| `SOCKS proxy error` | The `httpx[socks]` dependency is included. Run `uv sync` to install |
 | `No image generated` | Try a more descriptive prompt, or rephrase your request |
 
 ## Related Projects

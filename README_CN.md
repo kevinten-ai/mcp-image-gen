@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  一个轻量级的 <a href="https://modelcontextprotocol.io/">MCP</a> 服务器，基于 Google Gemini 实现 AI 图片生成。<br>
+  一个轻量级的 <a href="https://modelcontextprotocol.io/">MCP</a> 服务器，基于 Google Gemini 和 Imagen 实现 AI 图片生成。<br>
   支持 Claude Code、Claude Desktop、Cursor 及所有 MCP 兼容客户端。
 </p>
 
@@ -21,8 +21,8 @@
 
 ## 特性
 
-- 基于 Google Gemini 的文生图能力
-- 多模型支持（Nano Banana 2、实验版、Pro）
+- **双模式** — AI Studio（免费）或 Vertex AI（GCP 赠金）
+- **多模型** — Gemini 图片生成 + Imagen 3.0
 - 生成图片自动保存到磁盘
 - 内置 SOCKS 代理支持
 - 极简接口 — 描述你想要的即可
@@ -40,54 +40,28 @@
 </p>
 
 ```
-用户提示词 → AI 助手（Claude / Cursor）→ MCP Server → Gemini API
+用户提示词 → AI 助手（Claude / Cursor）→ MCP Server → Gemini API / Vertex AI
                                             ↓
                                       保存到磁盘 + 展示图片
 ```
 
 ## 快速开始
 
-### 1. 获取 Gemini API Key
+### 方案 A：AI Studio（免费，推荐）
 
-| 项目 | 详情 |
-|---|---|
-| 平台 | Google AI Studio |
-| 地址 | https://aistudio.google.com/apikey |
-| 免费额度 | **实验版模型完全免费，无需信用卡** |
-| 环境变量 | `GEMINI_API_KEY` |
+**1. 获取 API Key** — 访问 https://aistudio.google.com/apikey → 创建 API Key → 复制
 
-**注册步骤：**
-1. 访问 https://aistudio.google.com/apikey
-2. 使用 Google 账号登录
-3. 点击 **"Create API Key"**（创建 API Key）
-4. 选择或创建一个 Google Cloud 项目
-5. 复制生成的 Key（格式：`AIzaSy...`）
-
-> 如需使用更高质量模型（Nano Banana 2 / Pro），需要在 [AI Studio 计费页面](https://aistudio.google.com/billing) 开启付费。
-
-### 2. 安装
+**2. 配置 MCP**
 
 ```bash
-git clone https://github.com/kevinten-ai/mcp-image-gen.git
-cd mcp-image-gen
-uv sync
-```
-
-### 3. 配置 MCP
-
-#### Claude Code
-
-```bash
+# Claude Code
 claude mcp add --transport stdio gemini-image \
   --env GEMINI_API_KEY=你的api_key \
   -- uv --directory /path/to/mcp-image-gen run image-gen
 ```
 
-#### Claude Desktop
-
-编辑配置文件 `~/Library/Application Support/Claude/claude_desktop_config.json`（macOS）或 `%APPDATA%/Claude/claude_desktop_config.json`（Windows）：
-
 ```json
+// Claude Desktop / Cursor
 {
   "mcpServers": {
     "gemini-image": {
@@ -101,11 +75,46 @@ claude mcp add --transport stdio gemini-image \
 }
 ```
 
-#### Cursor
+### 方案 B：Vertex AI（使用 GCP 赠金）
 
-添加到项目根目录的 `.cursor/mcp.json` 或全局 `~/.cursor/mcp.json`，JSON 格式同上。
+使用 GCP 计费 + Imagen 3.0，获得更高质量的生成结果。
 
-### 4. 使用
+**1. 前置条件**
+- 已启用计费的 GCP 项目
+- 已启用 Vertex AI API
+- GCP API Key（从 [APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials) 获取）
+
+**2. 安装（含 Vertex AI 依赖）**
+
+```bash
+git clone https://github.com/kevinten-ai/mcp-image-gen.git
+cd mcp-image-gen
+uv sync --extra vertex
+```
+
+**3. 配置 MCP**
+
+```json
+{
+  "mcpServers": {
+    "gemini-image": {
+      "command": "uv",
+      "args": ["--directory", "/path/to/mcp-image-gen", "--extra", "vertex", "run", "image-gen"],
+      "env": {
+        "GEMINI_PROVIDER": "vertex-ai",
+        "GEMINI_API_KEY": "你的gcp_api_key",
+        "GCP_PROJECT_ID": "你的项目ID",
+        "GCP_REGION": "us-central1",
+        "GEMINI_MODEL": "imagen-3.0-generate-002"
+      }
+    }
+  }
+}
+```
+
+> **提示：** Vertex AI 也支持 OAuth2/ADC 认证。未设置 `GEMINI_API_KEY` 时，服务器会使用 `gcloud auth application-default login` 凭据。
+
+### 3. 使用
 
 直接用自然语言告诉 AI 助手你想生成什么图片：
 
@@ -138,15 +147,16 @@ claude mcp add --transport stdio gemini-image \
 
 通过 `GEMINI_MODEL` 环境变量切换模型：
 
+**AI Studio（Gemini 模型）：**
 ```bash
-# 实验版 — 免费，广泛可用（默认）
---env GEMINI_MODEL=gemini-2.0-flash-exp-image-generation
+--env GEMINI_MODEL=gemini-2.0-flash-exp-image-generation      # 免费实验版（默认）
+--env GEMINI_MODEL=gemini-2.0-flash-preview-image-generation   # 预览版
+```
 
-# Nano Banana 2 — 更高质量，需付费
---env GEMINI_MODEL=gemini-3.1-flash-image-preview
-
-# Nano Banana Pro — 最佳质量，需付费
---env GEMINI_MODEL=gemini-3-pro-image-preview
+**Vertex AI（Imagen 模型）：**
+```bash
+--env GEMINI_MODEL=imagen-3.0-generate-002       # 高质量
+--env GEMINI_MODEL=imagen-3.0-fast-generate-001   # 更快，成本更低
 ```
 
 ### 自定义输出目录
@@ -155,24 +165,32 @@ claude mcp add --transport stdio gemini-image \
 --env IMAGE_OUTPUT_DIR=/你的/图片/保存/路径
 ```
 
-图片保存格式为 `gemini_YYYYMMDD_HHMMSS.png`。
-
 ## 环境变量
 
 | 变量 | 必填 | 默认值 | 说明 |
 |---|---|---|---|
-| `GEMINI_API_KEY` | 是 | — | Google Gemini API Key，从 [AI Studio](https://aistudio.google.com/apikey) 获取 |
+| `GEMINI_PROVIDER` | 否 | `ai-studio` | `ai-studio` 或 `vertex-ai` |
+| `GEMINI_API_KEY` | 是 | — | API Key（AI Studio 或 GCP） |
 | `GEMINI_MODEL` | 否 | `gemini-2.0-flash-exp-image-generation` | 图片生成模型 |
 | `IMAGE_OUTPUT_DIR` | 否 | `./output` | 图片保存目录 |
+| `GCP_PROJECT_ID` | Vertex AI | — | GCP 项目 ID |
+| `GCP_REGION` | 否 | `us-central1` | GCP 区域 |
 
 ## 支持的模型
 
-| 模型 ID | 名称 | 质量 | 价格 |
-|---|---|---|---|
-| `gemini-2.0-flash-exp-image-generation` | 实验版 | 良好 | 免费 |
-| `gemini-3.1-flash-image-preview` | Nano Banana 2 | 高 | ~$0.039/张 |
-| `gemini-3-pro-image-preview` | Nano Banana Pro | 最佳 | ~$0.134/张 |
-| `gemini-2.5-flash-image` | Nano Banana | 良好 | ~$0.039/张 |
+### AI Studio（Gemini）
+
+| 模型 ID | 质量 | 价格 |
+|---|---|---|
+| `gemini-2.0-flash-exp-image-generation` | 良好 | 免费 |
+| `gemini-2.0-flash-preview-image-generation` | 良好 | 免费 |
+
+### Vertex AI（Imagen）
+
+| 模型 ID | 质量 | 价格 |
+|---|---|---|
+| `imagen-3.0-generate-002` | 高 | ~$0.04/张 |
+| `imagen-3.0-fast-generate-001` | 良好 | ~$0.02/张 |
 
 ## 前置要求
 
@@ -185,7 +203,7 @@ claude mcp add --transport stdio gemini-image \
 git clone https://github.com/kevinten-ai/mcp-image-gen.git
 cd mcp-image-gen
 
-# 安装依赖
+# 安装依赖（Vertex AI 支持加 --extra vertex）
 uv sync
 
 # 复制并配置环境变量
@@ -201,9 +219,11 @@ uv run image-gen
 | 问题 | 解决方案 |
 |---|---|
 | `GEMINI_API_KEY not set` | 在 MCP 配置中设置环境变量 |
-| `429 quota exceeded` | 在 [AI Studio](https://aistudio.google.com/billing) 开启付费，或切换到实验版模型 |
-| `User location is not supported` | 部分模型有地区限制，尝试使用 `gemini-2.0-flash-exp-image-generation` |
-| `SOCKS proxy error` | 已内置 `httpx[socks]` 依赖，运行 `uv sync` 安装即可 |
+| `429 quota exceeded` | 开启计费或切换到免费实验版模型 |
+| `429 spending cap exceeded` | 在 GCP Billing → Budgets 中提高消费上限 |
+| `404 model not found` | 检查模型名 — Vertex AI 和 AI Studio 使用不同的模型 ID |
+| `401 API keys not supported` | 部分 Vertex AI 模型需要 OAuth2 — 运行 `gcloud auth application-default login` |
+| `User location is not supported` | 部分模型有地区限制，尝试 `gemini-2.0-flash-exp-image-generation` |
 | `No image generated` | 尝试更具体的描述，或换一种说法 |
 
 ## 相关项目
