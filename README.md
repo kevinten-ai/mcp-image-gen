@@ -23,9 +23,10 @@
 
 - **Dual provider** — AI Studio (free) or Vertex AI (GCP credits)
 - **Multi-model** — Gemini image generation + Imagen 3.0
+- **Dynamic model switching** — choose model per request, no restart needed
+- **Built-in guides** — MCP resources with model selection tips and provider docs
 - Auto-save generated images to disk
 - SOCKS proxy support out of the box
-- Simple single-tool interface — just describe what you want
 
 ## Demo
 
@@ -145,7 +146,15 @@ Simply describe what you want in natural language:
 
 ### Choosing a Model
 
-Set `GEMINI_MODEL` to switch models:
+**Option 1: Per-request (recommended)** — pass `model` parameter directly:
+
+```
+"Generate a sunset landscape" → model: imagen-3.0-fast-generate-001
+```
+
+The AI assistant can dynamically pick the best model per request. If one model hits a quota limit, it automatically suggests switching to another.
+
+**Option 2: Default via env** — set `GEMINI_MODEL` for the default model:
 
 **AI Studio (Gemini models):**
 ```bash
@@ -159,6 +168,15 @@ Set `GEMINI_MODEL` to switch models:
 --env GEMINI_MODEL=imagen-3.0-fast-generate-001   # faster, lower cost
 ```
 
+### MCP Resources
+
+The server exposes built-in guides that AI assistants can read:
+
+| Resource URI | Description |
+|---|---|
+| `guide://models` | Model comparison, pricing, and selection tips |
+| `guide://providers` | Provider setup and troubleshooting |
+
 ### Custom Output Directory
 
 ```bash
@@ -171,7 +189,7 @@ Set `GEMINI_MODEL` to switch models:
 |---|---|---|---|
 | `GEMINI_PROVIDER` | No | `ai-studio` | `ai-studio` or `vertex-ai` |
 | `GEMINI_API_KEY` | Yes | — | API key (AI Studio or GCP) |
-| `GEMINI_MODEL` | No | `gemini-2.0-flash-exp-image-generation` | Model for generation |
+| `GEMINI_MODEL` | No | `gemini-2.0-flash-exp-image-generation` | Default model (can be overridden per request) |
 | `IMAGE_OUTPUT_DIR` | No | `./output` | Directory to save images |
 | `GCP_PROJECT_ID` | Vertex AI | — | GCP project ID |
 | `GCP_REGION` | No | `us-central1` | GCP region |
@@ -219,7 +237,7 @@ uv run image-gen
 | Issue | Solution |
 |---|---|
 | `GEMINI_API_KEY not set` | Set the environment variable in your MCP config |
-| `429 quota exceeded` | Enable billing or switch to the free experimental model |
+| `429 quota exceeded` | Switch model via `model` parameter (e.g., `imagen-3.0-fast-generate-001`) or request quota increase |
 | `429 spending cap exceeded` | Increase your GCP spending cap in Billing → Budgets |
 | `404 model not found` | Check model name — Vertex AI and AI Studio use different model IDs |
 | `401 API keys not supported` | Some Vertex AI models need OAuth2 — run `gcloud auth application-default login` |

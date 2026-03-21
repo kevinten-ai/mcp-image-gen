@@ -23,9 +23,10 @@
 
 - **双模式** — AI Studio（免费）或 Vertex AI（GCP 赠金）
 - **多模型** — Gemini 图片生成 + Imagen 3.0
+- **动态切换模型** — 每次请求可选择不同模型，无需重启
+- **内置指南** — MCP Resources 提供模型选型和配置文档
 - 生成图片自动保存到磁盘
 - 内置 SOCKS 代理支持
-- 极简接口 — 描述你想要的即可
 
 ## 效果演示
 
@@ -145,7 +146,15 @@ uv sync --extra vertex
 
 ### 切换模型
 
-通过 `GEMINI_MODEL` 环境变量切换模型：
+**方式一：每次请求动态选择（推荐）** — 传入 `model` 参数：
+
+```
+"生成一张日落风景图" → model: imagen-3.0-fast-generate-001
+```
+
+AI 助手可以根据需求动态选择模型。遇到配额限制时，会自动建议切换到其他模型。
+
+**方式二：通过环境变量设置默认模型：**
 
 **AI Studio（Gemini 模型）：**
 ```bash
@@ -159,6 +168,15 @@ uv sync --extra vertex
 --env GEMINI_MODEL=imagen-3.0-fast-generate-001   # 更快，成本更低
 ```
 
+### MCP Resources
+
+服务器内置指南文档，AI 助手可自动读取参考：
+
+| 资源 URI | 说明 |
+|---|---|
+| `guide://models` | 模型对比、价格、选型建议 |
+| `guide://providers` | 服务商配置和问题排查 |
+
 ### 自定义输出目录
 
 ```bash
@@ -171,7 +189,7 @@ uv sync --extra vertex
 |---|---|---|---|
 | `GEMINI_PROVIDER` | 否 | `ai-studio` | `ai-studio` 或 `vertex-ai` |
 | `GEMINI_API_KEY` | 是 | — | API Key（AI Studio 或 GCP） |
-| `GEMINI_MODEL` | 否 | `gemini-2.0-flash-exp-image-generation` | 图片生成模型 |
+| `GEMINI_MODEL` | 否 | `gemini-2.0-flash-exp-image-generation` | 默认模型（可在每次请求中覆盖） |
 | `IMAGE_OUTPUT_DIR` | 否 | `./output` | 图片保存目录 |
 | `GCP_PROJECT_ID` | Vertex AI | — | GCP 项目 ID |
 | `GCP_REGION` | 否 | `us-central1` | GCP 区域 |
@@ -219,7 +237,7 @@ uv run image-gen
 | 问题 | 解决方案 |
 |---|---|
 | `GEMINI_API_KEY not set` | 在 MCP 配置中设置环境变量 |
-| `429 quota exceeded` | 开启计费或切换到免费实验版模型 |
+| `429 quota exceeded` | 通过 `model` 参数切换模型（如 `imagen-3.0-fast-generate-001`），或申请提高配额 |
 | `429 spending cap exceeded` | 在 GCP Billing → Budgets 中提高消费上限 |
 | `404 model not found` | 检查模型名 — Vertex AI 和 AI Studio 使用不同的模型 ID |
 | `401 API keys not supported` | 部分 Vertex AI 模型需要 OAuth2 — 运行 `gcloud auth application-default login` |

@@ -1,6 +1,6 @@
 [project]
 name = "gemini-image-gen"
-version = "1.1.0"
+version = "1.2.0"
 description = "MCP server for AI image generation using Google Gemini and Imagen. Supports AI Studio (free) and Vertex AI (GCP credits)."
 readme = "README.md"
 license = "MIT"
