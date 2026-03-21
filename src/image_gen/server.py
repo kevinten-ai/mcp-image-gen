@@ -77,25 +77,41 @@ MODEL_GUIDE = """# Image Generation Model Guide
 
 ### AI Studio (Free, set GEMINI_PROVIDER=ai-studio)
 
-| Model ID | Quality | Pricing | Best for |
-|---|---|---|---|
-| `gemini-2.0-flash-exp-image-generation` | Good | Free | General use, experimentation |
-| `gemini-2.0-flash-preview-image-generation` | Good | Free | Preview features |
+| Model ID | Quality | Speed | Pricing | Best for |
+|---|---|---|---|---|
+| `gemini-2.0-flash-exp-image-generation` | Good | Fast | Free | Getting started, experimentation |
+| `gemini-2.0-flash-preview-image-generation` | Good | Fast | Free | Preview features |
 
 ### Vertex AI (GCP Credits, set GEMINI_PROVIDER=vertex-ai)
 
-| Model ID | Quality | Pricing | Best for |
-|---|---|---|---|
-| `imagen-3.0-generate-002` | High | ~$0.04/img | High-quality production images |
-| `imagen-3.0-fast-generate-001` | Good | ~$0.02/img | Fast iteration, lower cost |
-| `gemini-2.0-flash-preview-image-generation` | Good | Pay-per-use | Text+image multimodal |
+| Model ID | Quality | Speed | Pricing | Best for |
+|---|---|---|---|---|
+| `imagen-3.0-generate-002` | **High** | Slower | ~$0.04/img | Production, marketing visuals |
+| `imagen-3.0-fast-generate-001` | Good | **Fast** | ~$0.02/img | Rapid iteration, prototyping |
+| `gemini-2.0-flash-preview-image-generation` | Good | Fast | Pay-per-use | Multimodal text+image |
 
-## Model Selection Tips
+## Model Selection Decision
 
-1. **Hit quota limit on imagen-3.0-generate-002?** → Switch to `imagen-3.0-fast-generate-001` (separate quota, faster, cheaper)
-2. **Need highest quality?** → Use `imagen-3.0-generate-002` on Vertex AI
-3. **Free usage?** → Use `gemini-2.0-flash-exp-image-generation` on AI Studio
-4. **Rapid prototyping?** → Use `imagen-3.0-fast-generate-001` for quick iterations
+```
+Need an image?
+  |-- Free / no GCP --> gemini-2.0-flash-exp-image-generation
+  +-- Have GCP billing?
+      |-- Highest quality --> imagen-3.0-generate-002
+      |-- Fast/cheap --> imagen-3.0-fast-generate-001 <-- recommended default
+      +-- Hit quota? --> switch model (each has independent quota)
+```
+
+## Quota & Cost Tips
+
+- **IMPORTANT: Each model has independent API quota.** If `imagen-3.0-generate-002` returns 429, \
+switching to `imagen-3.0-fast-generate-001` works because they have separate rate limits.
+- Default Vertex AI quota for Imagen is often just 5 requests per minute (QPM). \
+Request a quota increase at GCP Console > IAM & Admin > Quotas.
+- `imagen-3.0-fast-generate-001` costs half the price ($0.02 vs $0.04) and has its own quota pool. \
+Best default for Vertex AI users.
+- There are TWO different 429 errors:
+  - "Quota exceeded for online_prediction_requests_per_base_model" = rate limit, switch model or wait
+  - "Quota exceeded ... spending cap" = billing cap, increase in GCP Billing > Budgets
 
 ## How to Switch Models
 
@@ -103,29 +119,48 @@ Pass the `model` parameter when calling `generate_image`:
 ```
 generate_image(prompt="...", model="imagen-3.0-fast-generate-001")
 ```
-If omitted, the default model from env config is used.
+If omitted, the default model ({default_model}) is used.
 """
 
 PROVIDER_GUIDE = """# Provider Configuration Guide
 
 ## AI Studio (Default, Free)
 - Set `GEMINI_PROVIDER=ai-studio`
-- Get API key from https://aistudio.google.com/apikey
+- Get API key from https://aistudio.google.com/apikey (format: AIzaSy...)
 - Set `GEMINI_API_KEY=your_key`
 - Free tier with generous limits
+- Models: `gemini-2.0-flash-exp-image-generation`, `gemini-2.0-flash-preview-image-generation`
 
-## Vertex AI (GCP Credits)
+## Vertex AI (GCP Credits, Higher Quality)
 - Set `GEMINI_PROVIDER=vertex-ai`
-- Requires: GCP project with billing, Vertex AI API enabled
+- Requires: GCP project with billing enabled, Vertex AI API enabled
 - Set `GCP_PROJECT_ID=your-project-id`
-- Auth: `GEMINI_API_KEY` (GCP API key) or ADC (`gcloud auth application-default login`)
-- Supports Imagen 3.0 models (higher quality)
+- Set `GCP_REGION=us-central1` (or your preferred region)
+- Auth option 1: `GEMINI_API_KEY` (GCP API key, simpler)
+- Auth option 2: ADC (`gcloud auth application-default login`, no API key needed)
+- Models: `imagen-3.0-generate-002`, `imagen-3.0-fast-generate-001`, `gemini-2.0-flash-preview-image-generation`
 
-## Common Issues
-- **429 spending cap**: Increase cap in GCP Billing → Budgets
-- **429 quota exceeded**: Switch model or request quota increase
-- **404 model not found**: Check model ID matches your provider
-- **401 API keys not supported**: Use ADC auth instead
+## Troubleshooting
+
+### Quota Errors (429)
+| Error message contains | Cause | Fix |
+|---|---|---|
+| `online_prediction_requests_per_base_model` | Per-minute rate limit for that model | Switch to different model via `model` param, or wait 1 min |
+| `spending cap` | Self-imposed billing limit | Increase cap in GCP Billing > Budgets & alerts |
+
+### Auth Errors
+| Error | Fix |
+|---|---|
+| `401 API keys not supported` | Use ADC: `gcloud auth application-default login`, remove GEMINI_API_KEY |
+| `403 Permission denied` | Enable Vertex AI API in GCP Console, check API key restrictions |
+| `Vertex AI auth failed` | Set GEMINI_API_KEY or configure ADC |
+
+### Model Errors
+| Error | Fix |
+|---|---|
+| `404 model not found` | Check model ID matches provider. AI Studio: gemini-* only. Vertex: both imagen-* and gemini-* |
+| `User location is not supported` | Change GCP_REGION or try gemini-2.0-flash-exp-* (fewest restrictions) |
+| `No image generated` | Use more descriptive prompt, avoid restricted content |
 """
 
 # ── Server ───────────────────────────────────────────────────────────────────
