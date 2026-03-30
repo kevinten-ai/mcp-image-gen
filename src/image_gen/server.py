@@ -45,6 +45,18 @@ MODELS = {
         },
     },
     "vertex-ai": {
+        "imagen-4.0-generate-001": {
+            "name": "Imagen 4 Fast",
+            "quality": "High",
+            "pricing": "~$0.02/image",
+            "api": "predict",
+        },
+        "imagen-4.0-ultra-generate-001": {
+            "name": "Imagen 4 Ultra",
+            "quality": "Highest",
+            "pricing": "~$0.06/image",
+            "api": "predict",
+        },
         "imagen-3.0-generate-002": {
             "name": "Imagen 3.0 (High Quality)",
             "quality": "High",
@@ -86,8 +98,10 @@ MODEL_GUIDE = """# Image Generation Model Guide
 
 | Model ID | Quality | Speed | Pricing | Best for |
 |---|---|---|---|---|
-| `imagen-3.0-generate-002` | **High** | Slower | ~$0.04/img | Production, marketing visuals |
-| `imagen-3.0-fast-generate-001` | Good | **Fast** | ~$0.02/img | Rapid iteration, prototyping |
+| `imagen-4.0-generate-001` | **High** | Fast | ~$0.02/img | Best value, recommended default |
+| `imagen-4.0-ultra-generate-001` | **Highest** | Slower | ~$0.06/img | Premium quality |
+| `imagen-3.0-generate-002` | High | Slower | ~$0.04/img | Legacy, stable |
+| `imagen-3.0-fast-generate-001` | Good | **Fast** | ~$0.02/img | Legacy fast |
 | `gemini-2.0-flash-preview-image-generation` | Good | Fast | Pay-per-use | Multimodal text+image |
 
 ## Model Selection Decision
@@ -96,8 +110,8 @@ MODEL_GUIDE = """# Image Generation Model Guide
 Need an image?
   |-- Free / no GCP --> gemini-2.0-flash-exp-image-generation
   +-- Have GCP billing?
-      |-- Highest quality --> imagen-3.0-generate-002
-      |-- Fast/cheap --> imagen-3.0-fast-generate-001 <-- recommended default
+      |-- Highest quality --> imagen-4.0-ultra-generate-001
+      |-- Fast/cheap --> imagen-4.0-generate-001 <-- recommended default
       +-- Hit quota? --> switch model (each has independent quota)
 ```
 
