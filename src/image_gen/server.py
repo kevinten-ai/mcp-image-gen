@@ -323,7 +323,7 @@ async def handle_list_tools() -> list[types.Tool]:
     models = _available_models()
     model_desc = ", ".join(f"`{m}`" for m in models) if models else "none configured"
 
-    return [
+    tools = [
         types.Tool(
             name="generate_image",
             description=(
@@ -350,35 +350,83 @@ async def handle_list_tools() -> list[types.Tool]:
                 },
                 "required": ["prompt"],
             },
-        )
+        ),
     ]
 
+    # Edit image tool (Vertex AI only, Imagen models)
+    if GEMINI_PROVIDER == "vertex-ai":
+        tools.append(types.Tool(
+            name="edit_image",
+            description="Edit an existing image using a text prompt (inpainting/outpainting). Vertex AI Imagen only. Pass a base image and describe what to change.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "prompt": {
+                        "type": "string",
+                        "description": "Text description of the desired edit (e.g. 'Add a red hat on the person')",
+                    },
+                    "image_path": {
+                        "type": "string",
+                        "description": "Path to the base image to edit (local file path)",
+                    },
+                    "mask_path": {
+                        "type": "string",
+                        "description": "Path to mask image (white=edit area, black=keep). Optional — if omitted, the model auto-detects the edit area.",
+                    },
+                    "edit_mode": {
+                        "type": "string",
+                        "description": "Edit mode: inpainting (default), outpainting, or product-image",
+                        "enum": ["inpainting", "outpainting", "product-image"],
+                        "default": "inpainting",
+                    },
+                },
+                "required": ["prompt", "image_path"],
+            },
+        ))
 
-@server.call_tool()
-async def handle_call_tool(
-    name: str, arguments: dict | None
-) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
-    if not arguments:
-        return [types.TextContent(type="text", text="Missing arguments")]
+        tools.append(types.Tool(
+            name="upscale_image",
+            description="Upscale an image to higher resolution (2x or 4x) using Imagen. Vertex AI only.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "image_path": {
+                        "type": "string",
+                        "description": "Path to the image to upscale (local file path)",
+                    },
+                    "upscale_factor": {
+                        "type": "string",
+                        "description": "Upscale factor: x2 or x4. Default: x2",
+                        "enum": ["x2", "x4"],
+                        "default": "x2",
+                    },
+                },
+                "required": ["image_path"],
+            },
+        ))
 
-    if name != "generate_image":
-        return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
+    return tools
 
-    prompt = arguments.get("prompt")
-    if not prompt:
-        return [types.TextContent(type="text", text="Missing prompt")]
 
-    model = arguments.get("model", DEFAULT_MODEL)
+def _load_image_b64(image_path: str) -> tuple[str, str]:
+    """Load image from local path and return (base64_data, mime_type)."""
+    path = Path(image_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Image not found: {image_path}")
+    data = base64.b64encode(path.read_bytes()).decode()
+    mime = "image/jpeg" if path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+    return data, mime
 
+
+async def _vertex_predict(body: dict, model: str) -> list[types.TextContent | types.ImageContent]:
+    """Common helper for Vertex AI :predict calls (generate, edit, upscale)."""
     try:
         url, headers = _build_request_url_and_headers(model)
     except ValueError as e:
         return [types.TextContent(type="text", text=str(e))]
 
-    request_body = _build_request_body(prompt, model)
-
     async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=request_body, headers=headers, timeout=120.0)
+        response = await client.post(url, json=body, headers=headers, timeout=120.0)
 
         try:
             data = response.json()
@@ -403,6 +451,76 @@ async def handle_call_tool(
             return results
         except (KeyError, IndexError) as e:
             return [types.TextContent(type="text", text=f"Failed to parse response: {e}")]
+
+
+@server.call_tool()
+async def handle_call_tool(
+    name: str, arguments: dict | None
+) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+    if not arguments:
+        return [types.TextContent(type="text", text="Missing arguments")]
+
+    if name == "generate_image":
+        prompt = arguments.get("prompt")
+        if not prompt:
+            return [types.TextContent(type="text", text="Missing prompt")]
+
+        model = arguments.get("model", DEFAULT_MODEL)
+        request_body = _build_request_body(prompt, model)
+        return await _vertex_predict(request_body, model)
+
+    if name == "edit_image":
+        prompt = arguments.get("prompt")
+        image_path = arguments.get("image_path")
+        if not prompt or not image_path:
+            return [types.TextContent(type="text", text="Missing prompt or image_path")]
+
+        try:
+            img_b64, mime = _load_image_b64(image_path)
+        except FileNotFoundError as e:
+            return [types.TextContent(type="text", text=str(e))]
+
+        edit_mode = arguments.get("edit_mode", "inpainting")
+        instance: dict = {
+            "prompt": prompt,
+            "image": {"bytesBase64Encoded": img_b64},
+            "editConfig": {"editMode": edit_mode},
+        }
+
+        mask_path = arguments.get("mask_path")
+        if mask_path:
+            try:
+                mask_b64, _ = _load_image_b64(mask_path)
+                instance["mask"] = {"image": {"bytesBase64Encoded": mask_b64}}
+            except FileNotFoundError as e:
+                return [types.TextContent(type="text", text=str(e))]
+
+        model = "imagen-3.0-generate-002"  # Edit uses Imagen 3 model
+        body = {
+            "instances": [instance],
+            "parameters": {"sampleCount": 1},
+        }
+        return await _vertex_predict(body, model)
+
+    if name == "upscale_image":
+        image_path = arguments.get("image_path")
+        if not image_path:
+            return [types.TextContent(type="text", text="Missing image_path")]
+
+        try:
+            img_b64, _ = _load_image_b64(image_path)
+        except FileNotFoundError as e:
+            return [types.TextContent(type="text", text=str(e))]
+
+        factor = arguments.get("upscale_factor", "x2")
+        model = "imagen-3.0-generate-002"
+        body = {
+            "instances": [{"image": {"bytesBase64Encoded": img_b64}}],
+            "parameters": {"sampleCount": 1, "mode": "upscale", "upscaleConfig": {"upscaleFactor": factor}},
+        }
+        return await _vertex_predict(body, model)
+
+    return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
 
 
 async def main():
