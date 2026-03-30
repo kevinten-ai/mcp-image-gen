@@ -476,29 +476,42 @@ async def handle_call_tool(
             return [types.TextContent(type="text", text="Missing prompt or image_path")]
 
         try:
-            img_b64, mime = _load_image_b64(image_path)
+            img_b64, _ = _load_image_b64(image_path)
         except FileNotFoundError as e:
             return [types.TextContent(type="text", text=str(e))]
 
-        edit_mode = arguments.get("edit_mode", "inpainting")
-        instance: dict = {
-            "prompt": prompt,
-            "image": {"bytesBase64Encoded": img_b64},
-            "editConfig": {"editMode": edit_mode},
+        # Map simple edit_mode to Imagen API edit mode constants
+        edit_mode_map = {
+            "inpainting": "EDIT_MODE_INPAINT_INSERTION",
+            "outpainting": "EDIT_MODE_OUTPAINT",
+            "product-image": "EDIT_MODE_BGSWAP",
         }
+        edit_mode = edit_mode_map.get(arguments.get("edit_mode", "inpainting"), "EDIT_MODE_INPAINT_INSERTION")
+
+        # Imagen Edit uses referenceImages array (not instances[].image)
+        ref_images = [
+            {
+                "referenceImage": {"bytesBase64Encoded": img_b64},
+                "referenceType": "REFERENCE_TYPE_RAW",
+            }
+        ]
 
         mask_path = arguments.get("mask_path")
         if mask_path:
             try:
                 mask_b64, _ = _load_image_b64(mask_path)
-                instance["mask"] = {"image": {"bytesBase64Encoded": mask_b64}}
+                ref_images.append({
+                    "referenceImage": {"bytesBase64Encoded": mask_b64},
+                    "referenceType": "REFERENCE_TYPE_MASK",
+                    "maskImageConfig": {"maskMode": "MASK_MODE_USER_PROVIDED"},
+                })
             except FileNotFoundError as e:
                 return [types.TextContent(type="text", text=str(e))]
 
-        model = "imagen-3.0-generate-002"  # Edit uses Imagen 3 model
+        model = "imagen-3.0-capability-001"  # Dedicated edit model
         body = {
-            "instances": [instance],
-            "parameters": {"sampleCount": 1},
+            "instances": [{"prompt": prompt, "referenceImages": ref_images}],
+            "parameters": {"sampleCount": 1, "editConfig": {"editMode": edit_mode}},
         }
         return await _vertex_predict(body, model)
 
@@ -513,7 +526,7 @@ async def handle_call_tool(
             return [types.TextContent(type="text", text=str(e))]
 
         factor = arguments.get("upscale_factor", "x2")
-        model = "imagen-3.0-generate-002"
+        model = "imagen-4.0-upscale-preview"  # Dedicated upscale model
         body = {
             "instances": [{"image": {"bytesBase64Encoded": img_b64}}],
             "parameters": {"sampleCount": 1, "mode": "upscale", "upscaleConfig": {"upscaleFactor": factor}},
