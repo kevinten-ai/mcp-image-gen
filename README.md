@@ -12,7 +12,8 @@
 </p>
 
 <p align="center">
-  A lightweight <a href="https://modelcontextprotocol.io/">MCP</a> server for AI image generation using Google Gemini and Imagen.<br>
+  AI image generation, editing & upscaling via Google Gemini and Imagen.<br>
+  Generate, edit (inpainting), and upscale images — all through one MCP server.<br>
   Works with Claude Code, Claude Desktop, Cursor, and any MCP-compatible client.
 </p>
 
@@ -22,8 +23,9 @@
 
 ## Features
 
+- **3 tools** — `generate_image`, `edit_image` (inpainting/outpainting), `upscale_image` (2x/4x)
 - **Dual provider** — AI Studio (free) or Vertex AI (GCP credits)
-- **Multi-model** — Gemini image generation + Imagen 3.0
+- **Multi-model** — Gemini 2.0 Flash + Imagen 3.0 + **Imagen 4** (Fast & Ultra)
 - **Dynamic model switching** — choose model per request via `model` parameter, no restart needed
 - **Built-in guides** — MCP Resources with model selection tips and provider docs
 - **Smart error recovery** — auto-suggests alternative models on quota errors
@@ -54,8 +56,10 @@ The server handles two distinct Google APIs under one unified interface:
 
 | API | Models | Endpoint | Request Format |
 |---|---|---|---|
-| **Predict API** | `imagen-3.0-*` | Vertex AI only | `instances[].prompt` |
+| **Predict API** | `imagen-3.0-*`, `imagen-4.0-*` | Vertex AI only | `instances[].prompt` |
 | **GenerateContent API** | `gemini-2.0-*` | AI Studio + Vertex AI | `contents[].parts[].text` |
+| **Capability API** | `imagen-3.0-capability-001` | Vertex AI only | `instances[].referenceImages[]` (edit) |
+| **Upscale API** | `imagen-4.0-upscale-preview` | Vertex AI only | `instances[].image` (upscale) |
 
 The server automatically selects the correct API based on the model name prefix — `imagen*` routes to Predict, everything else to GenerateContent. You don't need to worry about this distinction.
 
@@ -105,7 +109,7 @@ The image will be displayed inline and automatically saved to the `output/` dire
 
 ### Option B: Vertex AI (Higher Quality, GCP Credits)
 
-Use GCP billing with Imagen 3.0 for higher quality results.
+Use GCP billing with Imagen 4 / 3.0 for higher quality results, plus image editing and upscaling.
 
 **1. Prerequisites**
 - A GCP project with billing enabled ([create one](https://console.cloud.google.com/projectcreate))
@@ -162,17 +166,29 @@ claude mcp add --transport stdio mcp-image \
 > 1. **GCP API Key** (recommended) — set `GEMINI_API_KEY`. Simple, no extra deps.
 > 2. **OAuth2 / ADC** — run `gcloud auth application-default login`. The server auto-detects ADC when no API key is set. Requires `--extra vertex` for `google-auth` dependency.
 
-## Usage Guide
+## Tools
 
-### Basic Image Generation
-
-Simply describe what you want in natural language:
-
+### generate_image — Text to Image
+Generate images from text prompts.
 ```
 "A cozy cafe in Paris at sunset"
-"A futuristic city skyline with flying cars"
-"A watercolor painting of a sunflower field"
 ```
+
+### edit_image — Image Editing (Vertex AI only)
+Edit existing images with text instructions. Supports inpainting, outpainting, and background swap.
+```
+edit_image(prompt="Add a red hat", image_path="/path/to/photo.png")
+edit_image(prompt="Replace background with beach", image_path="photo.png", edit_mode="product-image")
+edit_image(prompt="Expand the sky", image_path="photo.png", mask_path="mask.png", edit_mode="outpainting")
+```
+
+### upscale_image — Super Resolution (Vertex AI only)
+Upscale images to 2x or 4x resolution.
+```
+upscale_image(image_path="/path/to/photo.png", upscale_factor="x4")
+```
+
+## Usage Guide
 
 ### Tips for Better Results
 
@@ -203,10 +219,16 @@ Need an image?
   │
   └─ Have GCP billing?
       ├─ Need highest quality?
-      │   └─ imagen-3.0-generate-002 (~$0.04/img)
+      │   └─ imagen-4.0-ultra-generate-001 (~$0.06/img)
       │
-      ├─ Need fast iteration / lower cost?
-      │   └─ imagen-3.0-fast-generate-001 (~$0.02/img) ✅ recommended default
+      ├─ Best value (recommended)?
+      │   └─ imagen-4.0-generate-001 (~$0.02/img) ✅
+      │
+      ├─ Need to edit an image?
+      │   └─ edit_image tool (uses imagen-3.0-capability-001)
+      │
+      ├─ Need to upscale?
+      │   └─ upscale_image tool (uses imagen-4.0-upscale-preview)
       │
       └─ Hit quota on one model?
           └─ Switch to another — each model has independent quota
@@ -269,11 +291,20 @@ Images are saved with timestamps: `imagen_20260321_234225.png` or `gemini_202603
 
 | Model ID | Quality | Speed | Pricing | Best for |
 |---|---|---|---|---|
-| `imagen-3.0-generate-002` | **High** | Slower | ~$0.04/image | Production, marketing visuals |
-| `imagen-3.0-fast-generate-001` | Good | **Fast** | ~$0.02/image | Rapid iteration, prototyping |
+| `imagen-4.0-generate-001` | **High** | Fast | ~$0.02/image | Best value, recommended |
+| `imagen-4.0-ultra-generate-001` | **Highest** | Slower | ~$0.06/image | Premium quality |
+| `imagen-3.0-generate-002` | High | Slower | ~$0.04/image | Legacy, stable |
+| `imagen-3.0-fast-generate-001` | Good | **Fast** | ~$0.02/image | Legacy fast |
 | `gemini-2.0-flash-preview-image-generation` | Good | Fast | Pay-per-use | Multimodal text+image |
 
-> **Key insight**: Each model has its own independent API quota. If `imagen-3.0-generate-002` hits a 429, switching to `imagen-3.0-fast-generate-001` will work because they use separate rate limits.
+### Vertex AI — Specialized Models
+
+| Model ID | Tool | Pricing | Notes |
+|---|---|---|---|
+| `imagen-3.0-capability-001` | `edit_image` | ~$0.04/edit | Inpainting, outpainting, bg swap |
+| `imagen-4.0-upscale-preview` | `upscale_image` | Preview | 2x/4x super resolution |
+
+> **Key insight**: Each model has its own independent API quota. If one model hits a 429, switching to another will work because they use separate rate limits.
 
 ## Troubleshooting
 
