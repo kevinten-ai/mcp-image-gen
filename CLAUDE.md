@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-MCP server for AI image generation via Google Gemini and Imagen. Single tool (`generate_image`) with dynamic model selection per request.
+MCP server for AI image generation via Google Gemini and Imagen. Tools include `generate_image`, plus Vertex-only `edit_image` and `upscale_image`, with dynamic model selection per request.
 
 ## Architecture
 
@@ -27,7 +27,8 @@ uv run image-gen           # run server
 
 ## Common Pitfalls
 
-- Imagen models (`imagen-3.0-*`) are Vertex AI only — don't use with `ai-studio` provider
+- Imagen models are Vertex AI only — don't use `imagen-*` with the `ai-studio` provider
+- New generation defaults should use GA Gemini image model IDs, not expired `*-preview` IDs
 - Each model has **independent** API quota — 429 on one model doesn't mean all are blocked
 - Two kinds of 429: "quota exceeded" (rate limit) vs "spending cap" (billing limit) — different fixes
 - Vertex AI default QPM quota is very low (~5). Request increase via GCP Console.

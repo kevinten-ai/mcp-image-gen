@@ -14,8 +14,12 @@ import os
 # Provider: "ai-studio" (default) or "vertex-ai"
 GEMINI_PROVIDER = os.getenv("GEMINI_PROVIDER", "ai-studio")
 
-# Default model (can be overridden per request via tool parameter)
-DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp-image-generation")
+# Default model per provider (can be overridden per request via tool parameter)
+_DEFAULT_MODELS = {
+    "ai-studio": "gemini-3.1-flash-image",
+    "vertex-ai": "gemini-3.1-flash-image",
+}
+DEFAULT_MODEL = os.getenv("GEMINI_MODEL", _DEFAULT_MODELS.get(GEMINI_PROVIDER, "gemini-3.1-flash-image"))
 
 # Output directory for saved images
 IMAGE_OUTPUT_DIR = os.getenv("IMAGE_OUTPUT_DIR", os.path.join(os.getcwd(), "output"))
@@ -28,52 +32,68 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "")
 GCP_REGION = os.getenv("GCP_REGION", "us-central1")
 
+# Edit/Upscale models (configurable, with sensible defaults)
+EDIT_MODEL = os.getenv("EDIT_MODEL", "imagen-3.0-capability-001")
+UPSCALE_MODEL = os.getenv("UPSCALE_MODEL", "imagen-4.0-upscale-preview")
+
 # ── Model catalog ────────────────────────────────────────────────────────────
 MODELS = {
     "ai-studio": {
-        "gemini-2.0-flash-exp-image-generation": {
-            "name": "Gemini 2.0 Flash (Experimental)",
-            "quality": "Good",
-            "pricing": "Free",
+        "gemini-3.1-flash-image": {
+            "name": "Gemini 3.1 Flash Image",
+            "quality": "Highest",
+            "pricing": "Free (AI Studio)",
             "api": "generateContent",
         },
-        "gemini-2.0-flash-preview-image-generation": {
-            "name": "Gemini 2.0 Flash (Preview)",
+        "gemini-3-pro-image": {
+            "name": "Gemini 3 Pro Image",
+            "quality": "Highest",
+            "pricing": "Free (AI Studio)",
+            "api": "generateContent",
+        },
+        "gemini-2.5-flash-image": {
+            "name": "Gemini 2.5 Flash Image",
             "quality": "Good",
             "pricing": "Free",
             "api": "generateContent",
         },
     },
     "vertex-ai": {
-        "imagen-4.0-generate-001": {
-            "name": "Imagen 4 Fast",
-            "quality": "High",
-            "pricing": "~$0.02/image",
-            "api": "predict",
+        "gemini-3.1-flash-image": {
+            "name": "Gemini 3.1 Flash Image",
+            "quality": "Highest",
+            "pricing": "Pay-per-use",
+            "api": "generateContent",
+        },
+        "gemini-3-pro-image": {
+            "name": "Gemini 3 Pro Image",
+            "quality": "Highest",
+            "pricing": "Pay-per-use",
+            "api": "generateContent",
+        },
+        "gemini-2.5-flash-image": {
+            "name": "Gemini 2.5 Flash Image",
+            "quality": "Good",
+            "pricing": "Pay-per-use",
+            "api": "generateContent",
         },
         "imagen-4.0-ultra-generate-001": {
             "name": "Imagen 4 Ultra",
             "quality": "Highest",
-            "pricing": "~$0.06/image",
+            "pricing": "~$0.06/image (deprecated Aug 17, 2026)",
             "api": "predict",
         },
-        "imagen-3.0-generate-002": {
-            "name": "Imagen 3.0 (High Quality)",
+        "imagen-4.0-generate-001": {
+            "name": "Imagen 4 Standard",
             "quality": "High",
-            "pricing": "~$0.04/image",
+            "pricing": "~$0.04/image (deprecated Aug 17, 2026)",
             "api": "predict",
         },
-        "imagen-3.0-fast-generate-001": {
-            "name": "Imagen 3.0 Fast",
-            "quality": "Good",
-            "pricing": "~$0.02/image",
+        "imagen-4.0-fast-generate-001": {
+            "name": "Imagen 4 Fast",
+            "quality": "High",
+            "pricing": "~$0.02/image (deprecated Aug 17, 2026)",
             "api": "predict",
-        },
-        "gemini-2.0-flash-preview-image-generation": {
-            "name": "Gemini 2.0 Flash (Preview, on Vertex)",
-            "quality": "Good",
-            "pricing": "Pay-per-use",
-            "api": "generateContent",
         },
     },
 }
@@ -91,38 +111,41 @@ MODEL_GUIDE = """# Image Generation Model Guide
 
 | Model ID | Quality | Speed | Pricing | Best for |
 |---|---|---|---|---|
-| `gemini-2.0-flash-exp-image-generation` | Good | Fast | Free | Getting started, experimentation |
-| `gemini-2.0-flash-preview-image-generation` | Good | Fast | Free | Preview features |
+| `gemini-3.1-flash-image` | **Highest** | Fast | Free | **Recommended default**, best quality+speed balance |
+| `gemini-3-pro-image` | **Highest** | Slower | Free | Reasoning-enhanced, best composition |
+| `gemini-2.5-flash-image` | Good | Fast | Free | Legacy-compatible fallback |
 
 ### Vertex AI (GCP Credits, set GEMINI_PROVIDER=vertex-ai)
 
 | Model ID | Quality | Speed | Pricing | Best for |
 |---|---|---|---|---|
-| `imagen-4.0-generate-001` | **High** | Fast | ~$0.02/img | Best value, recommended default |
-| `imagen-4.0-ultra-generate-001` | **Highest** | Slower | ~$0.06/img | Premium quality |
-| `imagen-3.0-generate-002` | High | Slower | ~$0.04/img | Legacy, stable |
-| `imagen-3.0-fast-generate-001` | Good | **Fast** | ~$0.02/img | Legacy fast |
-| `gemini-2.0-flash-preview-image-generation` | Good | Fast | Pay-per-use | Multimodal text+image |
+| `gemini-3.1-flash-image` | **Highest** | Fast | Pay-per-use | **Recommended default**, conversational generation/editing |
+| `gemini-3-pro-image` | **Highest** | Slower | Pay-per-use | Reasoning-enhanced composition |
+| `gemini-2.5-flash-image` | Good | Fast | Pay-per-use | Legacy-compatible fallback |
+| `imagen-4.0-ultra-generate-001` | **Highest** | Slower | ~$0.06/img | Deprecated Aug 17, 2026; premium legacy Imagen |
+| `imagen-4.0-generate-001` | **High** | Fast | ~$0.04/img | Deprecated Aug 17, 2026; legacy Imagen |
+| `imagen-4.0-fast-generate-001` | High | **Fastest** | ~$0.02/img | Deprecated Aug 17, 2026; fast legacy Imagen |
 
 ## Model Selection Decision
 
 ```
 Need an image?
-  |-- Free / no GCP --> gemini-2.0-flash-exp-image-generation
+  |-- Free / no GCP --> gemini-3.1-flash-image (AI Studio)
   +-- Have GCP billing?
-      |-- Highest quality --> imagen-4.0-ultra-generate-001
-      |-- Fast/cheap --> imagen-4.0-generate-001 <-- recommended default
+      |-- General generation/editing --> gemini-3.1-flash-image <-- recommended default
+      |-- Reasoning-enhanced --> gemini-3-pro-image
+      |-- Legacy Imagen quality --> imagen-4.0-ultra-generate-001
+      |-- Legacy Imagen value --> imagen-4.0-generate-001
       +-- Hit quota? --> switch model (each has independent quota)
 ```
 
 ## Quota & Cost Tips
 
-- **IMPORTANT: Each model has independent API quota.** If `imagen-3.0-generate-002` returns 429, \
-switching to `imagen-3.0-fast-generate-001` works because they have separate rate limits.
+- **IMPORTANT: Each model has independent API quota.** If one model returns 429, \
+switching to a different model works because they have separate rate limits.
 - Default Vertex AI quota for Imagen is often just 5 requests per minute (QPM). \
 Request a quota increase at GCP Console > IAM & Admin > Quotas.
-- `imagen-3.0-fast-generate-001` costs half the price ($0.02 vs $0.04) and has its own quota pool. \
-Best default for Vertex AI users.
+- Imagen 4 generation model IDs are kept only for legacy Vertex AI users and are scheduled for retirement.
 - There are TWO different 429 errors:
   - "Quota exceeded for online_prediction_requests_per_base_model" = rate limit, switch model or wait
   - "Quota exceeded ... spending cap" = billing cap, increase in GCP Billing > Budgets
@@ -131,7 +154,7 @@ Best default for Vertex AI users.
 
 Pass the `model` parameter when calling `generate_image`:
 ```
-generate_image(prompt="...", model="imagen-3.0-fast-generate-001")
+generate_image(prompt="...", model="gemini-3-pro-image")
 ```
 If omitted, the default model ({default_model}) is used.
 """
@@ -143,7 +166,7 @@ PROVIDER_GUIDE = """# Provider Configuration Guide
 - Get API key from https://aistudio.google.com/apikey (format: AIzaSy...)
 - Set `GEMINI_API_KEY=your_key`
 - Free tier with generous limits
-- Models: `gemini-2.0-flash-exp-image-generation`, `gemini-2.0-flash-preview-image-generation`
+- Models: `gemini-3.1-flash-image`, `gemini-3-pro-image`, `gemini-2.5-flash-image`
 
 ## Vertex AI (GCP Credits, Higher Quality)
 - Set `GEMINI_PROVIDER=vertex-ai`
@@ -152,7 +175,7 @@ PROVIDER_GUIDE = """# Provider Configuration Guide
 - Set `GCP_REGION=us-central1` (or your preferred region)
 - Auth option 1: `GEMINI_API_KEY` (GCP API key, simpler)
 - Auth option 2: ADC (`gcloud auth application-default login`, no API key needed)
-- Models: `imagen-3.0-generate-002`, `imagen-3.0-fast-generate-001`, `gemini-2.0-flash-preview-image-generation`
+- Models: `gemini-3.1-flash-image`, `gemini-3-pro-image`, `gemini-2.5-flash-image`, `imagen-4.0-ultra-generate-001`, `imagen-4.0-generate-001`, `imagen-4.0-fast-generate-001`
 
 ## Troubleshooting
 
@@ -173,7 +196,7 @@ PROVIDER_GUIDE = """# Provider Configuration Guide
 | Error | Fix |
 |---|---|
 | `404 model not found` | Check model ID matches provider. AI Studio: gemini-* only. Vertex: both imagen-* and gemini-* |
-| `User location is not supported` | Change GCP_REGION or try gemini-2.0-flash-exp-* (fewest restrictions) |
+| `User location is not supported` | Change GCP_REGION or try gemini-3.1-flash-image |
 | `No image generated` | Use more descriptive prompt, avoid restricted content |
 """
 
@@ -508,7 +531,7 @@ async def handle_call_tool(
             except FileNotFoundError as e:
                 return [types.TextContent(type="text", text=str(e))]
 
-        model = "imagen-3.0-capability-001"  # Dedicated edit model
+        model = EDIT_MODEL
         body = {
             "instances": [{"prompt": prompt, "referenceImages": ref_images}],
             "parameters": {"sampleCount": 1, "editConfig": {"editMode": edit_mode}},
@@ -526,7 +549,7 @@ async def handle_call_tool(
             return [types.TextContent(type="text", text=str(e))]
 
         factor = arguments.get("upscale_factor", "x2")
-        model = "imagen-4.0-upscale-preview"  # Dedicated upscale model
+        model = UPSCALE_MODEL
         body = {
             "instances": [{"image": {"bytesBase64Encoded": img_b64}}],
             "parameters": {"sampleCount": 1, "mode": "upscale", "upscaleConfig": {"upscaleFactor": factor}},
@@ -543,7 +566,7 @@ async def main():
             write_stream,
             InitializationOptions(
                 server_name="gemini-image-gen",
-                server_version="1.2.0",
+                server_version="1.3.0",
                 capabilities=server.get_capabilities(
                     notification_options=NotificationOptions(),
                     experimental_capabilities={},

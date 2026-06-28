@@ -8,7 +8,7 @@
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+"></a>
   <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-compatible-green.svg" alt="MCP"></a>
-  <img src="https://img.shields.io/badge/version-1.2.0-blue.svg" alt="Version 1.2.0">
+  <img src="https://img.shields.io/badge/version-1.3.0-blue.svg" alt="Version 1.3.0">
 </p>
 
 <p align="center">
@@ -25,7 +25,7 @@
 
 - **3 tools** — `generate_image`, `edit_image` (inpainting/outpainting), `upscale_image` (2x/4x)
 - **Dual provider** — AI Studio (free) or Vertex AI (GCP credits)
-- **Multi-model** — Gemini 2.0 Flash + Imagen 3.0 + **Imagen 4** (Fast & Ultra)
+- **Multi-model** — Gemini 3.1 / 3 Pro Image, Gemini 2.5 Flash Image, and legacy Imagen 4 on Vertex AI
 - **Dynamic model switching** — choose model per request via `model` parameter, no restart needed
 - **Built-in guides** — MCP Resources with model selection tips and provider docs
 - **Smart error recovery** — auto-suggests alternative models on quota errors
@@ -56,8 +56,8 @@ The server handles two distinct Google APIs under one unified interface:
 
 | API | Models | Endpoint | Request Format |
 |---|---|---|---|
-| **Predict API** | `imagen-3.0-*`, `imagen-4.0-*` | Vertex AI only | `instances[].prompt` |
-| **GenerateContent API** | `gemini-2.0-*` | AI Studio + Vertex AI | `contents[].parts[].text` |
+| **Predict API** | `imagen-4.0-*` | Vertex AI only | `instances[].prompt` |
+| **GenerateContent API** | `gemini-*` | AI Studio + Vertex AI | `contents[].parts[].text` |
 | **Capability API** | `imagen-3.0-capability-001` | Vertex AI only | `instances[].referenceImages[]` (edit) |
 | **Upscale API** | `imagen-4.0-upscale-preview` | Vertex AI only | `instances[].image` (upscale) |
 
@@ -109,7 +109,7 @@ The image will be displayed inline and automatically saved to the `output/` dire
 
 ### Option B: Vertex AI (Higher Quality, GCP Credits)
 
-Use GCP billing with Imagen 4 / 3.0 for higher quality results, plus image editing and upscaling.
+Use GCP billing with Gemini image models, optional legacy Imagen 4 generation, plus image editing and upscaling.
 
 **1. Prerequisites**
 - A GCP project with billing enabled ([create one](https://console.cloud.google.com/projectcreate))
@@ -135,7 +135,7 @@ claude mcp add --transport stdio mcp-image \
   --env GEMINI_API_KEY=your_gcp_api_key \
   --env GCP_PROJECT_ID=your-project-id \
   --env GCP_REGION=us-central1 \
-  --env GEMINI_MODEL=imagen-3.0-fast-generate-001 \
+  --env GEMINI_MODEL=gemini-3.1-flash-image \
   -- uv --directory /path/to/mcp-image-gen --extra vertex run image-gen
 ```
 </details>
@@ -154,7 +154,7 @@ claude mcp add --transport stdio mcp-image \
         "GEMINI_API_KEY": "your_gcp_api_key",
         "GCP_PROJECT_ID": "your-project-id",
         "GCP_REGION": "us-central1",
-        "GEMINI_MODEL": "imagen-3.0-fast-generate-001"
+        "GEMINI_MODEL": "gemini-3.1-flash-image"
       }
     }
   }
@@ -205,7 +205,7 @@ upscale_image(image_path="/path/to/photo.png", upscale_factor="x4")
 Pass the `model` parameter when calling the tool:
 
 ```
-generate_image(prompt="a sunset landscape", model="imagen-3.0-fast-generate-001")
+generate_image(prompt="a sunset landscape", model="gemini-3-pro-image")
 ```
 
 AI assistants can dynamically pick the best model per request. If one model hits a quota limit, the error response automatically suggests an alternative.
@@ -215,14 +215,14 @@ AI assistants can dynamically pick the best model per request. If one model hits
 ```
 Need an image?
   ├─ Free / no GCP account?
-  │   └─ AI Studio: gemini-2.0-flash-exp-image-generation ✅
+  │   └─ AI Studio: gemini-3.1-flash-image ✅
   │
   └─ Have GCP billing?
-      ├─ Need highest quality?
-      │   └─ imagen-4.0-ultra-generate-001 (~$0.06/img)
+      ├─ Need balanced quality/speed?
+      │   └─ gemini-3.1-flash-image ✅
       │
-      ├─ Best value (recommended)?
-      │   └─ imagen-4.0-generate-001 (~$0.02/img) ✅
+      ├─ Need stronger reasoning/composition?
+      │   └─ gemini-3-pro-image
       │
       ├─ Need to edit an image?
       │   └─ edit_image tool (uses imagen-3.0-capability-001)
@@ -240,12 +240,13 @@ Set `GEMINI_MODEL` to configure the default model used when no `model` parameter
 
 ```bash
 # AI Studio (Gemini models)
-GEMINI_MODEL=gemini-2.0-flash-exp-image-generation      # free, experimental (default)
-GEMINI_MODEL=gemini-2.0-flash-preview-image-generation   # preview
+GEMINI_MODEL=gemini-3.1-flash-image      # default, balanced
+GEMINI_MODEL=gemini-3-pro-image          # stronger reasoning/composition
+GEMINI_MODEL=gemini-2.5-flash-image      # fallback
 
-# Vertex AI (Imagen models)
-GEMINI_MODEL=imagen-3.0-generate-002       # high quality
-GEMINI_MODEL=imagen-3.0-fast-generate-001  # faster, lower cost — recommended for Vertex AI
+# Vertex AI (Gemini + legacy Imagen models)
+GEMINI_MODEL=gemini-3.1-flash-image        # default
+GEMINI_MODEL=imagen-4.0-generate-001       # legacy Imagen; retires Aug 17, 2026
 ```
 
 ### MCP Resources
@@ -273,7 +274,7 @@ Images are saved with timestamps: `imagen_20260321_234225.png` or `gemini_202603
 |---|---|---|---|
 | `GEMINI_PROVIDER` | No | `ai-studio` | `ai-studio` or `vertex-ai` |
 | `GEMINI_API_KEY` | Yes* | — | API key (AI Studio or GCP). *Not required if using ADC. |
-| `GEMINI_MODEL` | No | `gemini-2.0-flash-exp-image-generation` | Default model (can be overridden per request via `model` parameter) |
+| `GEMINI_MODEL` | No | `gemini-3.1-flash-image` | Default model (can be overridden per request via `model` parameter) |
 | `IMAGE_OUTPUT_DIR` | No | `./output` | Directory to save generated images |
 | `GCP_PROJECT_ID` | Vertex AI only | — | GCP project ID |
 | `GCP_REGION` | No | `us-central1` | GCP region for Vertex AI |
@@ -284,18 +285,20 @@ Images are saved with timestamps: `imagen_20260321_234225.png` or `gemini_202603
 
 | Model ID | Quality | Speed | Pricing | Best for |
 |---|---|---|---|---|
-| `gemini-2.0-flash-exp-image-generation` | Good | Fast | Free | Getting started, experimentation |
-| `gemini-2.0-flash-preview-image-generation` | Good | Fast | Free | Preview features |
+| `gemini-3.1-flash-image` | **Highest** | Fast | Free | Recommended default |
+| `gemini-3-pro-image` | **Highest** | Slower | Free | Reasoning-enhanced composition |
+| `gemini-2.5-flash-image` | Good | Fast | Free | Fallback |
 
 ### Vertex AI (Imagen) — GCP Credits
 
 | Model ID | Quality | Speed | Pricing | Best for |
 |---|---|---|---|---|
-| `imagen-4.0-generate-001` | **High** | Fast | ~$0.02/image | Best value, recommended |
-| `imagen-4.0-ultra-generate-001` | **Highest** | Slower | ~$0.06/image | Premium quality |
-| `imagen-3.0-generate-002` | High | Slower | ~$0.04/image | Legacy, stable |
-| `imagen-3.0-fast-generate-001` | Good | **Fast** | ~$0.02/image | Legacy fast |
-| `gemini-2.0-flash-preview-image-generation` | Good | Fast | Pay-per-use | Multimodal text+image |
+| `gemini-3.1-flash-image` | **Highest** | Fast | Pay-per-use | Recommended default |
+| `gemini-3-pro-image` | **Highest** | Slower | Pay-per-use | Reasoning-enhanced composition |
+| `gemini-2.5-flash-image` | Good | Fast | Pay-per-use | Fallback |
+| `imagen-4.0-generate-001` | High | Fast | ~$0.04/image | Legacy Imagen; retires Aug 17, 2026 |
+| `imagen-4.0-ultra-generate-001` | Highest | Slower | ~$0.06/image | Legacy Imagen; retires Aug 17, 2026 |
+| `imagen-4.0-fast-generate-001` | High | Fastest | ~$0.02/image | Legacy Imagen; retires Aug 17, 2026 |
 
 ### Vertex AI — Specialized Models
 
@@ -325,13 +328,13 @@ These are the most common errors. There are **two distinct 429 errors** with dif
 
 **Quick fix:** Switch to a different model via the `model` parameter — each model has independent quota:
 ```
-generate_image(prompt="...", model="imagen-3.0-fast-generate-001")
+generate_image(prompt="...", model="gemini-3-pro-image")
 ```
 
 **Long-term fix:** Request a quota increase:
 1. Go to [GCP Console → IAM & Admin → Quotas](https://console.cloud.google.com/iam-admin/quotas)
 2. Filter by `online_prediction_requests_per_base_model`
-3. Find your model (e.g., `imagen-3.0-generate`)
+3. Find your model (e.g., `gemini-3.1-flash-image` or `imagen-4.0-generate`)
 4. Click **Edit Quotas** → request a higher limit (default is often just 5 QPM)
 
 #### `429: Quota exceeded ... spending cap`
@@ -343,7 +346,7 @@ generate_image(prompt="...", model="imagen-3.0-fast-generate-001")
 2. Find the budget with a spending cap
 3. Increase or remove the cap
 
-> **Tip:** `imagen-3.0-fast-generate-001` costs ~$0.02/image vs $0.04 for the high-quality version. Setting it as default halves your spending.
+> **Tip:** Prefer Gemini image models for new configurations. Imagen 4 generation IDs remain available for legacy Vertex AI setups but are scheduled for retirement on Aug 17, 2026.
 
 ### Authentication Errors
 
@@ -358,7 +361,7 @@ generate_image(prompt="...", model="imagen-3.0-fast-generate-001")
 | Error | Root Cause | Solution |
 |---|---|---|
 | `404 model not found` | Wrong model ID for provider | AI Studio uses `gemini-*`, Vertex AI supports both `imagen-*` and `gemini-*` |
-| `User location is not supported` | Regional restriction on model | Try a different region (`GCP_REGION`) or model. `gemini-2.0-flash-exp-*` has fewest restrictions |
+| `User location is not supported` | Regional restriction on model | Try a different region (`GCP_REGION`) or model such as `gemini-3.1-flash-image` |
 | `No image generated` | Model declined or returned empty | Try a more descriptive prompt, avoid ambiguous or restricted content |
 
 ### Connection Errors
